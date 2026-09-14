@@ -1,0 +1,71 @@
+
+name: Matrix Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      commands:
+        description: 'Commands JSON array'
+        required: true
+        default: '[]'
+jobs:
+  run-workers:
+    runs-on: ${{ matrix.os }}
+
+    timeout-minutes: 360
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-latest]
+        worker: [1,2,3,4,5,6,7,8,9,10]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        run: |
+          echo "======================================="
+          echo "🚀 MATRIX WORKER: ${{ matrix.worker }}"
+          echo "======================================="
+          echo "Hostname: $(hostname)"
+          echo "Date: $(date)"
+          echo "CPU: $(nproc)"
+          echo ""
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Build
+        shell: bash
+        run: |
+          COMMANDS='${{ github.event.inputs.commands }}'
+          echo "$COMMANDS" | jq -r '.[]' | while IFS= read -r cmd; do
+            if [ ! -z "$cmd" ]; then
+              bash -c "$cmd"
+              EXIT_CODE=$?
+              if [ $EXIT_CODE -ne 0 ]; then
+                echo ""
+                echo "❌ Command failed: $EXIT_CODE"
+                exit $EXIT_CODE
+              fi
+            fi
+          done
+
+          echo ""
+          echo "✅ Worker completed"
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "======================================="
+          echo "✅ Worker Finished"
+          echo "======================================="
+          echo "Worker: ${{ matrix.worker }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "======================================="
